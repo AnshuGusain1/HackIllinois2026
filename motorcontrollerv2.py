@@ -3,13 +3,12 @@ import time
 
 PWMA = 12
 PWMB = 13
-AIN1 = 5
 BIN1 = 6
 STBY = 16
 
 def test():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup([PWMA, PWMB, AIN1, BIN1, STBY], GPIO.OUT)
+    GPIO.setup([PWMA, PWMB, BIN1, STBY], GPIO.OUT)
     GPIO.output(STBY, GPIO.HIGH)
     time.sleep(0.5)
 
@@ -18,38 +17,27 @@ def test():
     pwm_a.start(0)
     pwm_b.start(0)
 
-    # Test 1: Direct LOW (should work - this was your "backward")
-    print("Test 1: AIN1=LOW (should spin)")
-    GPIO.output(AIN1, GPIO.LOW)
-    GPIO.output(BIN1, GPIO.LOW)
+    # AIN1 is physically wired to 5V (not controlled by code)
+    # So we only test motor A here
+
+    print("Test: AIN1 wired to 5V - motor A should spin")
     pwm_a.ChangeDutyCycle(100)
-    pwm_b.ChangeDutyCycle(100)
     time.sleep(3)
 
     pwm_a.ChangeDutyCycle(0)
-    pwm_b.ChangeDutyCycle(0)
     time.sleep(2)
 
-    # Test 2: Use PWM to simulate HIGH (trick the Schmitt inverter)
-    print("Test 2: AIN1=PWM fake HIGH")
-    GPIO.setup(AIN1, GPIO.OUT)
-    GPIO.setup(BIN1, GPIO.OUT)
-    ain_pwm = GPIO.PWM(AIN1, 10000)
-    bin_pwm = GPIO.PWM(BIN1, 10000)
-    ain_pwm.start(100)
-    bin_pwm.start(100)
-    pwm_a.ChangeDutyCycle(100)
+    # Now test BIN1 with GPIO LOW for comparison
+    print("Test: BIN1=LOW - motor B should spin")
+    GPIO.output(BIN1, GPIO.LOW)
     pwm_b.ChangeDutyCycle(100)
     time.sleep(3)
 
-    ain_pwm.stop()
-    bin_pwm.stop()
-    pwm_a.ChangeDutyCycle(0)
     pwm_b.ChangeDutyCycle(0)
     GPIO.output(STBY, GPIO.LOW)
     pwm_a.stop()
     pwm_b.stop()
     GPIO.cleanup()
-    print("Done. Did the directions change between Test 1 and Test 2?")
+    print("Done.")
 
 test()
