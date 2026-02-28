@@ -1,31 +1,26 @@
 import RPi.GPIO as GPIO
 import time
 
-# L298N pins
-VS_PIN = None  # powered by battery directly
-IN1 = 5
-IN2 = 22
-ENA = 12
+GPIO.setmode(GPIO.BCM)
+GPIO.setup([5, 12, 16], GPIO.OUT)
+GPIO.output(16, GPIO.HIGH)  # STBY on
 
-def test():
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup([IN1, IN2, ENA], GPIO.OUT)
+pwm = GPIO.PWM(12, 1000)
+pwm.start(60)
 
-    # Enable at full power, no PWM
-    GPIO.output(ENA, GPIO.HIGH)
+print("Forward - AIN1 HIGH (Pi LOW, MOSFET OFF)")
+GPIO.output(5, GPIO.LOW)
+time.sleep(3)
 
-    print("Test: IN1=HIGH, IN2=LOW - motor A should spin")
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
-    time.sleep(5)
+print("Stop")
+pwm.ChangeDutyCycle(0)
+time.sleep(1)
 
-    print("Test: IN1=LOW, IN2=HIGH - motor A should spin other way")
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.HIGH)
-    time.sleep(5)
+print("Backward - AIN1 LOW (Pi HIGH, MOSFET ON)")
+pwm.ChangeDutyCycle(60)
+GPIO.output(5, GPIO.HIGH)
+time.sleep(3)
 
-    GPIO.output(ENA, GPIO.LOW)
-    GPIO.cleanup()
-    print("Done. Did motor A spin?")
-
-test()
+print("Done")
+pwm.stop()
+GPIO.cleanup()
