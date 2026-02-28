@@ -1,6 +1,7 @@
 import argparse
 import math
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -10,6 +11,11 @@ try:
     import smbus2 as smbus
 except ImportError:
     import smbus  # type: ignore
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 
 MPU6050_ADDR = 0x68
@@ -134,6 +140,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--alpha", type=float, default=0.98, help="Complementary filter alpha for roll/pitch")
     p.add_argument("--accel-deadband", type=float, default=0.12, help="Linear accel deadband (m/s^2)")
     p.add_argument("--vel-damping", type=float, default=0.35, help="Velocity damping per second (helps drift)")
+    p.add_argument("--plot", action="store_true", help="Show live matplotlib graphs")
+    p.add_argument("--plot-seconds", type=float, default=12.0, help="Graph history window in seconds")
+    p.add_argument("--plot-decimate", type=int, default=2, help="Update graph every N samples")
     return p.parse_args()
 
 
@@ -169,7 +178,39 @@ def main() -> None:
     print(f"Mount zero (deg): roll0={cal.roll0_deg:+.2f} pitch0={cal.pitch0_deg:+.2f}")
     print("Running... Press Ctrl+C to stop.")
 
+    plot_enabled = bool(args.plot)
+    if plot_enabled and plt is None:
+        print("Matplotlib is not installed. Install with: pip3 install matplotlib")
+        plot_enabled = False
+
+    max_points = max(60, int(max(2.0, float(args.plot_seconds)) * hz))
+    t_hist = deque(maxlen=max_points)
+    angle_hist = deque(maxlen=max_points)
+    vel_hist = deque(maxlen=max_points)
+    accel_hist = deque(maxlen=max_points)
+
+    if plot_enabled:
+        plt.ion()
+        fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+        fig.suptitle("MPU-6050 Live Data")
+
+        ax_angle, ax_vel, ax_acc = axes
+        lines_angle = [ax_angle.plot([], [], label=lbl)[0] for lbl in ("roll", "pitch", "yaw")]
+        lines_vel = [ax_vel.plot([], [], label=lbl)[0] for lbl in ("vx", "vy", "vz")]
+        lines_acc = [ax_acc.plot([], [], label=lbl)[0] for lbl in ("ax", "ay", "az")]
+
+        ax_angle.set_ylabel("Angle (deg)")
+        ax_vel.set_ylabel("Velocity (m/s)")
+        ax_acc.set_ylabel("Accel (m/s^2)")
+        ax_acc.set_xlabel("Time (s)")
+        for ax in axes:
+            ax.grid(True, alpha=0.3)
+            ax.legend(loc="upper left")
+        fig.tight_layout(rect=[0, 0.02, 1, 0.96])
+
     last_t = time.perf_counter()
+    t0 = last_t
+    sample_i = 0
     try:
         while True:
             now = time.perf_counter()
@@ -206,6 +247,12 @@ def main() -> None:
             speed = float(np.linalg.norm(velocity_world))
             lin_mag = float(np.linalg.norm(linear_world))
 
+            t_rel = now - t0
+            t_hist.append(t_rel)
+            angle_hist.append((rel_roll, rel_pitch, rel_yaw))
+            vel_hist.append((float(velocity_world[0]), float(velocity_world[1]), float(velocity_world[2])))
+            accel_hist.append((float(linear_world[0]), float(linear_world[1]), float(linear_world[2])))
+
             # Refresh terminal screen.
             print("\x1b[2J\x1b[H", end="")
             print("MPU-6050 Live Monitor")
@@ -228,12 +275,37 @@ def main() -> None:
             )
             print("Ctrl+C to stop")
 
+            sample_i += 1
+            if plot_enabled and (sample_i % max(1, int(args.plot_decimate)) == 0):
+                t_np = np.array(t_hist, dtype=np.float64)
+                ang_np = np.array(angle_hist, dtype=np.float64)
+                vel_np = np.array(vel_hist, dtype=np.float64)
+                acc_np = np.array(accel_hist, dtype=np.float64)
+                if t_np.size >= 2:
+                    for j in range(3):
+                        lines_angle[j].set_data(t_np, ang_np[:, j])
+                        lines_vel[j].set_data(t_np, vel_np[:, j])
+                        lines_acc[j].set_data(t_np, acc_np[:, j])
+
+                    x0 = max(0.0, t_np[-1] - max(2.0, float(args.plot_seconds)))
+                    x1 = max(x0 + 1e-3, t_np[-1])
+                    for ax in (ax_angle, ax_vel, ax_acc):
+                        ax.set_xlim(x0, x1)
+                        ax.relim()
+                        ax.autoscale_view(scalex=False, scaley=True)
+
+                    fig.canvas.draw_idle()
+                    plt.pause(0.001)
+
             elapsed = time.perf_counter() - now
             time.sleep(max(0.0, dt_target - elapsed))
     except KeyboardInterrupt:
         pass
     finally:
         dev.close()
+        if plot_enabled:
+            plt.ioff()
+            plt.close("all")
         print("\nStopped.")
 
 
