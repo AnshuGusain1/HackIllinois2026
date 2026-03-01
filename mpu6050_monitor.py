@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-<<<<<<< HEAD
 """
 MPU6050 live reader + live plot in ONE program:
 - Reads MPU6050 over I2C (smbus/smbus2)
@@ -14,9 +13,6 @@ Notes:
 """
 
 import time
-=======
-import argparse
->>>>>>> parent of 0d56362 (changed mpu)
 import math
 import os
 import time
@@ -31,7 +27,6 @@ try:
 except ImportError:
     import smbus  # type: ignore
 
-<<<<<<< HEAD
 # -----------------------
 # CONFIG
 # -----------------------
@@ -89,20 +84,6 @@ REG_PWR_MGMT_1   = 0x6B
 REG_SMPLRT_DIV   = 0x19
 REG_CONFIG       = 0x1A
 REG_GYRO_CONFIG  = 0x1B
-=======
-# Matplotlib live plot (recommended on Raspberry Pi Desktop)
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
-
-
-MPU6050_ADDR = 0x68
-REG_PWR_MGMT_1 = 0x6B
-REG_SMPLRT_DIV = 0x19
-REG_CONFIG = 0x1A
-REG_GYRO_CONFIG = 0x1B
->>>>>>> parent of 0d56362 (changed mpu)
 REG_ACCEL_CONFIG = 0x1C
 REG_ACCEL_XOUT_H = 0x3B
 
@@ -126,7 +107,6 @@ class MPU6050:
     def initialize(self) -> None:
         self._write(REG_PWR_MGMT_1, 0x00)
         time.sleep(0.1)
-<<<<<<< HEAD
 
         # DLPF config
         self._write(REG_CONFIG, 0x03)
@@ -135,10 +115,6 @@ class MPU6050:
         self._write(REG_SMPLRT_DIV, 4)
 
         # Accel full scale: 0x00 = +-2g
-=======
-        self._write(REG_CONFIG, 0x03)     # DLPF
-        self._write(REG_SMPLRT_DIV, 4)    # ~200 Hz internal (1kHz/(1+4))
->>>>>>> parent of 0d56362 (changed mpu)
         self._write(REG_ACCEL_CONFIG, 0x00)
         self._write(REG_GYRO_CONFIG, 0x00)
         time.sleep(0.05)
@@ -168,33 +144,15 @@ class MPU6050:
         return v - 65536 if v > 32767 else v
 
 
-<<<<<<< HEAD
 def accel_to_roll_pitch_rad(accel_g: np.ndarray) -> tuple[float, float]:
-=======
-def accel_to_roll_pitch_deg(accel_g: np.ndarray) -> Tuple[float, float]:
->>>>>>> parent of 0d56362 (changed mpu)
     ax, ay, az = accel_g
     roll = math.degrees(math.atan2(ay, az))
     pitch = math.degrees(math.atan2(-ax, math.sqrt(ay * ay + az * az)))
     return roll, pitch
 
 
-<<<<<<< HEAD
 def get_rotation_matrix(pitch: float, roll: float) -> np.ndarray:
     Rx = np.array(
-=======
-def rotation_body_to_world(roll_deg: float, pitch_deg: float, yaw_deg: float) -> np.ndarray:
-    r = math.radians(roll_deg)
-    p = math.radians(pitch_deg)
-    y = math.radians(yaw_deg)
-
-    cr, sr = math.cos(r), math.sin(r)
-    cp, sp = math.cos(p), math.sin(p)
-    cy, sy = math.cos(y), math.sin(y)
-
-    # ZYX rotation: body -> world
-    return np.array(
->>>>>>> parent of 0d56362 (changed mpu)
         [
             [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
             [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
@@ -210,15 +168,9 @@ def calibrate_sensor(dev: MPU6050, cal_seconds: float, hz: float) -> Calibration
     gyro_hist = []
     accel_hist = []
 
-<<<<<<< HEAD
     print("Calibrating gyro bias, keep the IMU still...")
     for _ in range(samples):
         _, gyro_dps = dev.read_accel_gyro()
-=======
-    print("Calibration: keep robot still...")
-    for i in range(samples):
-        accel_g, gyro_dps = dev.read_accel_gyro()
->>>>>>> parent of 0d56362 (changed mpu)
         gyro_hist.append(gyro_dps)
         accel_hist.append(accel_g)
         if (i + 1) % max(1, samples // 10) == 0:
@@ -272,7 +224,6 @@ def pitch_deg_to_pulse_us(pitch_deg: float) -> int:
 
 
 def main() -> None:
-<<<<<<< HEAD
     # --- Servo setup (NEW) ---
     try:
         import pigpio  # type: ignore
@@ -301,18 +252,6 @@ def main() -> None:
         print("Check wiring and I2C. Try: i2cdetect -y 1")
         pi.set_servo_pulsewidth(SERVO_GPIO, 0)
         pi.stop()
-=======
-    args = parse_args()
-    hz = max(5.0, float(args.hz))
-    dt_target = 1.0 / hz
-
-    dev = MPU6050(bus_id=args.bus, address=args.addr)
-    try:
-        dev.initialize()
-    except Exception as e:
-        print(f"Failed to initialize MPU-6050: {e}")
-        print("Check wiring and I2C (try `i2cdetect -y 1`).")
->>>>>>> parent of 0d56362 (changed mpu)
         return
 
     try:
@@ -364,7 +303,6 @@ def main() -> None:
         fig.tight_layout()
 
     last_t = time.perf_counter()
-<<<<<<< HEAD
 
     # -----------------------
     # Matplotlib setup
@@ -493,10 +431,6 @@ def main() -> None:
         return (poly, x_line, y_line, z_line, angle_text)
 
     ani = FuncAnimation(fig, update, interval=UPDATE_INTERVAL_MS, blit=False, cache_frame_data=False)
-=======
-    t0 = last_t
-    sample_i = 0
->>>>>>> parent of 0d56362 (changed mpu)
 
     try:
         while True:
